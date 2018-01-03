@@ -5,6 +5,7 @@ import colorsys
 import imghdr
 import os
 import random
+import time
 
 import numpy as np
 from keras import backend as K
@@ -115,6 +116,7 @@ def _main(args):
         iou_threshold=args.iou_threshold)
 
     for image_file in os.listdir(test_path):
+        start_time = time.time()
         try:
             image_type = imghdr.what(os.path.join(test_path, image_file))
             if not image_type:
@@ -187,6 +189,8 @@ def _main(args):
             del draw
 
         image.save(os.path.join(output_path, image_file), quality=90)
+        print("--- %s seconds ---" % (time.time() - start_time))
+
     sess.close()
 
 

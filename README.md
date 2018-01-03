@@ -87,3 +87,7 @@ YAD2K stands on the shoulders of giants.
 - [yolo2-pytorch](https://github.com/longcw/yolo2-pytorch) - YOLO_v2 in PyTorch.
 
 --------------------------------------------------------------------------------
+
+
+## add bottle server
+Add a bottle server for receving images

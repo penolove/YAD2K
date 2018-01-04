@@ -186,7 +186,6 @@ class YoloModel(object):
     def detect_images_in_folder(self, folder_path, db_update=False):
         records = Counter()
         for image_file in os.listdir(folder_path):
-            start_time = time.time()
             try:
                 image_type = imghdr.what(os.path.join(folder_path, image_file))
                 if not image_type:
@@ -196,7 +195,6 @@ class YoloModel(object):
             test_image_path = os.path.join(folder_path, image_file)
             img_result = self.image_detection(test_image_path, folder_path=folder_path)
             records.update([_class for (_class, _, _) in img_result])
-            print("--- %s seconds ---" % (time.time() - start_time))
         records = sorted(records.items(), key=lambda x: x[0])
         if db_update:
             folder_info = ";".join(["target|count" for target, count in records])
@@ -231,6 +229,7 @@ class YoloModel(object):
         detected_result_list: List[(str, (int, int), (int, int))]
             detected result List[(class, (x1, y1), (x2, y2))]
         """
+        start_time = time.time()
         image = Image.open(test_image_path)
         if self.is_fixed_size:  # TODO: When resizing we can use minibatch input.
             resized_image = image.resize(
@@ -312,7 +311,7 @@ class YoloModel(object):
         directory = os.path.dirname(image_outpath)
         pathlib.Path(directory).mkdir(parents=True, exist_ok=True)
         image.save(image_outpath, quality=90)
-
+        print("--- %s seconds ---" % (time.time() - start_time))
         return detected_result_list
 
 

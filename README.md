@@ -91,3 +91,8 @@ YAD2K stands on the shoulders of giants.
 
 ## add bottle server
 Add a bottle server for receving images
+ ./bottle_test_yolo.py model_data/yolo.h5
+
+- for my docker - change python path in the top of bottle_test_yolo.py
+- change ip of run()
+- yolo_model.detect_test_folder() is used to test demo images in the main function

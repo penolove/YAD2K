@@ -92,7 +92,7 @@ def _main(args):
         data = request.body.read()
         file_name = request.headers.get('output_name', 'temp.jpg')
         im_path = io.BytesIO(bytearray(data))
-        yolo_model.image_detection(im_path, image_name=file_name)
+        yolo_model.image_detection(im_path, post_image_name=file_name)
 
     run(host='localhost', port=5566, debug=True)
 
@@ -200,7 +200,7 @@ class YoloModel(object):
         self.conn.execute('''INSERT INTO image_info(image_path, timestamp)
                              VALUES(?,?)''', (image_path, arrive_timestamp))
 
-    def image_detection(self, test_image_path, image_name=None):
+    def image_detection(self, test_image_path, post_image_name=None):
         """image_detection
             give image_path return result of detections
 
@@ -210,9 +210,8 @@ class YoloModel(object):
             image_path.
             (can pass io.bytesio object, take a look upload_image in the main)
 
-        image_name: str
-            filename to save, if not given will use filename of test_image_path and save in
-            output folder
+        post_image_name: str
+            filename to save, this is used for post io.bytesio , both saving upload file and output
 
         Returns
         ---------
@@ -220,8 +219,11 @@ class YoloModel(object):
             detected result List[(class, (x1, y1), (x2, y2))]
         """
         from_post = not isinstance(test_image_path, str)
-        start_time = time.time()
         image = Image.open(test_image_path)
+        test_image_path = post_image_name
+        if from_post:
+            image.save(test_image_path, quality=90)
+        start_time = time.time()
         if self.is_fixed_size:  # TODO: When resizing we can use minibatch input.
             resized_image = image.resize(
                 tuple(reversed(self.model_image_size)), Image.BICUBIC)
@@ -271,14 +273,14 @@ class YoloModel(object):
             print(label, (left, top), (right, bottom))
             detected_result_list.append((predicted_class, (left, top), (right, bottom)))
             # save prediction result if not from post method
-            if not from_post:
-                try:
-                    self.conn.execute('''INSERT INTO image_annotation(image_path, x1, y1, x2, y2
-                                      ,label) VALUES (?,?,?,?,?,?)''',
-                                      (test_image_path, left, top, right, bottom, predicted_class))
-                    self.conn.commit()
-                except sqlite3.IntegrityError:
-                    pass
+
+            try:
+                self.conn.execute('''INSERT INTO image_annotation(image_path, x1, y1, x2, y2
+                                    ,label) VALUES (?,?,?,?,?,?)''',
+                                    (test_image_path, left, top, right, bottom, predicted_class))
+                self.conn.commit()
+            except sqlite3.IntegrityError:
+                pass
 
             if top - label_size[1] >= 0:
                 text_origin = np.array([left, top - label_size[1]])
@@ -295,10 +297,9 @@ class YoloModel(object):
             draw.text(text_origin, label, fill=(0, 0, 0), font=font)
             del draw
 
-            if not from_post:
-                image_outpath = os.path.join(self.output_path, test_image_path)
-            else:
-                image_outpath = os.path.join(self.output_path,'test',image_name)
+
+            image_outpath = os.path.join(self.output_path, test_image_path)
+
             directory = os.path.dirname(image_outpath)
             pathlib.Path(directory).mkdir(parents=True, exist_ok=True)
             image.save(image_outpath, quality=90)

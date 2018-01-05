@@ -197,8 +197,11 @@ class YoloModel(object):
             self.image_detection(test_image_path)
 
     def insert_image_info(self, image_path, arrive_timestamp):
-        self.conn.execute('''INSERT INTO image_info(image_path, timestamp)
-                             VALUES(?,?)''', (image_path, arrive_timestamp))
+        try:
+            self.conn.execute('''INSERT INTO image_info(image_path, timestamp)
+                              VALUES(?,?)''', (image_path, arrive_timestamp))
+        except:
+            pass
 
     def image_detection(self, test_image_path, post_image_name=None):
         """image_detection

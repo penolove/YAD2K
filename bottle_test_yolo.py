@@ -222,6 +222,8 @@ class YoloModel(object):
         image = Image.open(test_image_path)
         test_image_path = post_image_name
         if from_post:
+            directory = os.path.dirname(test_image_path)
+            pathlib.Path(directory).mkdir(parents=True, exist_ok=True)
             image.save(test_image_path, quality=90)
         start_time = time.time()
         if self.is_fixed_size:  # TODO: When resizing we can use minibatch input.

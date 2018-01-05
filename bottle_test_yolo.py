@@ -10,6 +10,7 @@ import pathlib
 import sqlite3
 import argparse
 import colorsys
+import arrow
 from collections import Counter
 
 import numpy as np
@@ -19,9 +20,6 @@ from PIL import Image, ImageDraw, ImageFont
 from bottle import route, run, request
 
 from yad2k.models.keras_yolo import yolo_eval, yolo_head
-
-
-
 
 parser = argparse.ArgumentParser(
     description='Run a YOLO_v2 style detection model on test images..')
@@ -67,27 +65,18 @@ parser.add_argument(
     help='datapath of db',
     default='default_yolo.sqlite3')
 
-
-
-
 def _main(args):
     yolo_model = YoloModel(args)
     # run test images
     yolo_model.detect_test_folder()
-
-    @route('/echo', method='POST')
-    def echo():
-        data = request.body.read()
-        body = json.loads(data.decode())
-        im_path = body['image_path']
-        yolo_model.image_detection(im_path, from_post=True)
 
     @route('/folder_detection', method='POST')
     def folder_detection():
         data = request.body.read()
         body = json.loads(data.decode())
         dir_path = body['dir_path']
-        yolo_model.detect_images_in_folder(dir_path, db_update=True)
+        arrive_timestamp = arrow.now().datetime
+        yolo_model.detect_images_in_folder(dir_path, db_update=True, timestamp=arrive_timestamp)
 
     @route('/upload_images', method='POST')
     def upload_image():
@@ -95,7 +84,7 @@ def _main(args):
         data = request.body.read()
         file_name = request.headers.get('output_name', 'temp.jpg')
         im_path = io.BytesIO(bytearray(data))
-        yolo_model.image_detection(im_path, image_outpath=file_name, from_post=True)
+        yolo_model.image_detection(im_path, image_name=file_name, from_post=True)
 
     run(host='localhost', port=5566, debug=True)
 
@@ -164,26 +153,29 @@ class YoloModel(object):
         # connet/create db, add table(if not exist)
         self.conn = sqlite3.connect(args.db_path)
         print('connet/create folder_info table')
-        self.conn.execute('''CREATE TABLE IF NOT EXISTS folder_info(folder_path TEXT PRIMARY KEY, folder_info TEXT)''')
+        self.conn.execute('''CREATE TABLE IF NOT EXISTS folder_info(folder_path TEXT PRIMARY KEY,
+                             folder_info TEXT, timestamp TIMESTAMP)''')
         self.conn.commit()
 
         print('connet/create image_info table')
         self.conn.execute('''CREATE TABLE IF NOT EXISTS image_info(
-                          image_path TEXT, 
+                          image_path TEXT,
                           folder_path TEXT,
-                          x1 INTEGER, 
+                          x1 INTEGER,
                           y1 INTEGER,
-                          x2 INTEGER, 
-                          y2 INTEGER,                          
+                          x2 INTEGER,
+                          y2 INTEGER,
                           label TEXT
                           )''')
-        self.conn.commit()        
+        self.conn.commit()
 
 
     def detect_test_folder(self):
-        self.detect_images_in_folder(self.test_path, True)
+        #self.detect_images_in_folder(self.test_path)
+        self.detect_images_in_folder(self.test_path, db_update=True,
+                                     timestamp = arrow.now().datetime)
 
-    def detect_images_in_folder(self, folder_path, db_update=False):
+    def detect_images_in_folder(self, folder_path, db_update=False, timestamp=None):
         records = Counter()
         for image_file in os.listdir(folder_path):
             try:
@@ -193,21 +185,23 @@ class YoloModel(object):
             except IsADirectoryError:
                 continue
             test_image_path = os.path.join(folder_path, image_file)
-            img_result = self.image_detection(test_image_path, folder_path=folder_path)
+            img_result = self.image_detection(test_image_path)
             records.update([_class for (_class, _, _) in img_result])
+
+        # object count detected in the all images in this folder
         records = sorted(records.items(), key=lambda x: x[0])
+
         if db_update:
-            folder_info = ";".join(["target|count" for target, count in records])
+            folder_info = ";".join(["%s|%s"%(target, count) for target, count in records])
             try:
-                self.conn.execute('''INSERT INTO folder_info(folder_path, folder_info)
-                                  VALUES(?,?)''', (folder_path, folder_info))
+                self.conn.execute('''INSERT INTO folder_info(folder_path, folder_info, timestamp)
+                                  VALUES(?,?,?)''', (folder_path, folder_info, timestamp))
                 self.conn.commit()
             except sqlite3.IntegrityError:
                 pass
 
 
-    def image_detection(self, test_image_path, folder_path='', image_outpath=None,
-                        from_post=False):
+    def image_detection(self, test_image_path, image_name=None, from_post=False):
         """image_detection
             give image_path return result of detections
 
@@ -215,10 +209,10 @@ class YoloModel(object):
         ----------
         test_image_path: str
             image_path.
-            (acctually can pass bytes, take a look upload_image in the main)
+            (can pass io.bytesio object, take a look upload_image in the main)
 
-        image_outpath: str
-            path to save image, if not given will use filename of test_image_path and save in
+        image_name: str
+            filename to save, if not given will use filename of test_image_path and save in
             output folder
 
         from_post: bool
@@ -282,8 +276,9 @@ class YoloModel(object):
             # save prediction result if not from post method
             if not from_post:
                 try:
+                    folder_path = os.path.dirname(test_image_path)
                     self.conn.execute('''INSERT INTO image_info(image_path, folder_path, x1, y1,
-                                      x2, y2 ,label) VALUES (?,?,?,?,?,?,?)''', 
+                                      x2, y2 ,label) VALUES (?,?,?,?,?,?,?)''',
                                       (test_image_path, folder_path, left, top, right,bottom,
                                        predicted_class))
                     self.conn.commit()
@@ -305,8 +300,8 @@ class YoloModel(object):
             draw.text(text_origin, label, fill=(0, 0, 0), font=font)
             del draw
 
-        if not image_outpath:
-            image_outpath = os.path.basename(test_image_path)
+        if not image_name:
+            image_outpath = os.path.basename(test_image_path)  # used for detect_images_in_folder
         image_outpath = os.path.join(self.output_path, image_outpath)
         directory = os.path.dirname(image_outpath)
         pathlib.Path(directory).mkdir(parents=True, exist_ok=True)
@@ -318,6 +313,6 @@ class YoloModel(object):
     def __del__(self):
         self.sess.close()
         self.conn.close()
-        
+
 if __name__ == '__main__':
     _main(parser.parse_args())

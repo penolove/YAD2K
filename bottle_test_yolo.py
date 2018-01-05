@@ -67,7 +67,7 @@ parser.add_argument(
 def _main(args):
     yolo_model = YoloModel(args)
     # run test images
-    yolo_model.detect_test_folder()
+    #yolo_model.detect_test_folder()
 
     @route('/echo', method='POST')
     def echo():

@@ -19,16 +19,12 @@ def get_img_write_webcam():
     cam.release()
     return frame
 
-dir_queue = []
-def post_yolo(prefix,min_path):
-    dir_queue.insert(0,min_path)
-    if len(dir_queue)>1:
-        try:
-            dir_path = dir_queue.pop()
-            r = requests.post("http://localhost:5566/home", data='{"dir_path": "'+prefix+dir_path+'"}')
-        except Exception as e:
-            print("====[file monitor] post somewhat fails===")
-            print(e)
+def post_yolo(img_path):
+    try:
+        r = requests.post("http://localhost:5566/echo", data='{"image_path": "'+img_path+'"}')
+    except Exception as e:
+        print("====[file monitor] post somewhat fails===")
+        print(e)
 
 if __name__ == '__main__':
     while True:
@@ -43,6 +39,7 @@ if __name__ == '__main__':
         img_path = '%s.jpg' % (os.path.join(target_dir, image_name))
         if Debug: print("current writing to", img_path)
         cv2.imwrite(img_path, frame)
+        post_yolo(img_path)
         time.sleep(5)
 
 

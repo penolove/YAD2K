@@ -218,10 +218,11 @@ class YoloModel(object):
         detected_result_list: List[(str, (int, int), (int, int))]
             detected result List[(class, (x1, y1), (x2, y2))]
         """
-        from_post = not isinstance(test_image_path, str)
+
         image = Image.open(test_image_path)
-        test_image_path = post_image_name
+        from_post = not isinstance(test_image_path, str)
         if from_post:
+            test_image_path = post_image_name
             directory = os.path.dirname(test_image_path)
             pathlib.Path(directory).mkdir(parents=True, exist_ok=True)
             image.save(test_image_path, quality=90)

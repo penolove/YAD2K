@@ -27,6 +27,7 @@ def post_yolo_path(img_path):
     except Exception as e:
         print("[post_yolo_path] post somewhat fails")
         print(e)
+    print("post done")
 
 def post_yolo_bytes(buf, output_name):
     print("posting buf to yolo server")
@@ -36,6 +37,7 @@ def post_yolo_bytes(buf, output_name):
     except Exception as e:
         print("[post_yolo_bytes] post somewhat fails")
         print(e)
+    print("post done")
 
 
 def write_image_sent_path():

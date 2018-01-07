@@ -107,6 +107,7 @@ def _main(args):
         data = request.body.read()
         file_name = request.headers.get('output_name', 'temp.jpg')
         im_path = io.BytesIO(bytearray(data))
+        print("[upload_image] get post_image with target_im_path", im_path)
 
         # detect image with yolo
         detected_results = yolo_model.image_detection(im_path, post_image_path=file_name)

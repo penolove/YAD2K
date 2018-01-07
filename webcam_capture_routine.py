@@ -89,7 +89,7 @@ def sent_image_bytes():
             retval, buffer = cv2.imencode('.jpg', frame)
             if Debug: print("[sent_image_bytes] current passing ", img_path)
             post_yolo_bytes(buffer.tobytes(), img_path, args)
-        time.sleep(5)
+        time.sleep(15)
 
 
 if __name__ == '__main__':

@@ -91,8 +91,18 @@ YAD2K stands on the shoulders of giants.
 
 ## add bottle server
 Add a bottle server for receving images
- ./bottle_test_yolo.py model_data/yolo.h5
+ 
+```bash
+ ./bottle_test_yolo.py model_data/yolo.h5 --ip localhost:5566 -o target
+```
+ip is the host, port used to listen
+target is the path to save image and put sqlite file
 
-- for my docker - change python path in the top of bottle_test_yolo.py
-- change ip of run()
-- yolo_model.detect_test_folder() is used to test demo images in the main function
+
+## add a naive webcam program used to post image to bottle server
+python webcam_capture_routine.py
+```bash
+ ./bottle_test_yolo.py model_data/yolo.h5 --ip localhost:5566 -o target
+```
+
+

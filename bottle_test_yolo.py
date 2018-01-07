@@ -64,6 +64,10 @@ parser.add_argument(
     help='threshold for non max suppression IOU, default .5',
     default=.5)
 parser.add_argument(
+    '--ip',
+    help='ip address used to listen',
+    default='localhost:5566')
+parser.add_argument(
     '-db_path',
     '--db_path',
     help='datapath of db',
@@ -71,6 +75,7 @@ parser.add_argument(
 
 def _main(args):
     yolo_model = YoloModel(args)
+    host, port = args.ip.split(':')
     # run test images
     yolo_model.detect_test_folder()
 
@@ -109,7 +114,7 @@ def _main(args):
         for detected_result in detected_results:
             yolo_model.insert_image_annotation(detected_result)
 
-    run(host='localhost', port=5566, debug=True)
+    run(host=host , port=port , debug=True)
 
 class YoloModel(object):
     def __init__(self, args):
@@ -124,7 +129,6 @@ class YoloModel(object):
         self.output_path_det = os.path.join(self.output_path, args.output_path_det)
 
         pathlib.Path(self.output_path_det).mkdir(parents=True, exist_ok=True)
-
 
         self.sess = K.get_session()  # TODO: Remove dependence on Tensorflow session.
 

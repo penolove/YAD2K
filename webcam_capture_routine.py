@@ -7,6 +7,7 @@ import pathlib
 import arrow
 import tempfile
 Debug = True
+TZINFO = '+08:00'
 
 parser = argparse.ArgumentParser(
     description='post image to bottle yolo server')
@@ -60,7 +61,7 @@ def write_image_sent_path(args):
         frame = get_img_write_webcam()
 
         # get time
-        now = arrow.now()
+        now = arrow.now(TZINFO)
         target_date = now.format('YYYY/MM/DD/HH')
         target_dir = os.path.join(args.BaseDir, target_date)
         pathlib.Path(target_dir).mkdir(parents=True, exist_ok=True)
@@ -81,7 +82,7 @@ def sent_image_bytes():
         frame = get_img_write_webcam()
         if frame is not None:
             # get time
-            now = arrow.now()
+            now = arrow.now(TZINFO)
             target_dir = now.format('YYYY/MM/DD/HH')
             pathlib.Path(target_dir).mkdir(parents=True, exist_ok=True)
             image_name = now.format('mm_ss')

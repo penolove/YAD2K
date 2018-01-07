@@ -256,7 +256,7 @@ class YoloModel(object):
         """image_detection
             function used to test demo images in images folder
         """
-        arrive_timestamp = arrow.now().datetime
+        arrive_timestamp = arrow.now("+08:00").datetime
         self.detect_images_in_folder(self.test_path, arrive_timestamp)
 
     def detect_images_in_folder(self, folder_path, arrive_timestamp):

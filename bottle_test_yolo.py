@@ -108,6 +108,8 @@ def _main(args):
         file_name = request.headers.get('output_name', 'temp.jpg')
         im_path = io.BytesIO(bytearray(data))
         print("[upload_image] get post_image with file_name :", file_name)
+        arrive_timestamp = arrow.now().datetime
+        yolo_model.insert_image_info(file_name, arrive_timestamp)
 
         # detect image with yolo
         detected_results = yolo_model.image_detection(im_path, post_image_path=file_name)

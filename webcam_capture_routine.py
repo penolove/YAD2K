@@ -6,7 +6,7 @@ import pathlib
 import arrow
 import tempfile
 Debug = True
-
+BaseDir = ''  # importpant if using write image
 
 def get_img_write_webcam():
     # used in webcam,
@@ -39,7 +39,6 @@ def post_yolo_bytes(buf, output_name):
         print(e)
     print("post done")
 
-
 def write_image_sent_path():
     while True:
         # get image
@@ -47,15 +46,19 @@ def write_image_sent_path():
 
         # get time
         now = arrow.now()
-        target_dir = now.format('YYYY/MM/DD/HH')
+        target_date = now.format('YYYY/MM/DD/HH')
+        target_dir = os.path.join(BaseDir, target_date)
         pathlib.Path(target_dir).mkdir(parents=True, exist_ok=True)
         image_name = now.format('mm_ss')
         img_path = '%s.jpg' % (os.path.join(target_dir, image_name))
         if Debug: print("[write_image_sent_path] current writing to", img_path)
+        # write to basedir/target_date/image_name
         cv2.imwrite(img_path, frame)
+
+        # post target_date/image_name to yolo server
+        img_path = '%s.jpg' % (os.path.join(target_date, image_name))
         post_yolo_path(img_path)
         time.sleep(5)
-
 
 def sent_image_bytes():
     while True:
@@ -75,7 +78,7 @@ def sent_image_bytes():
 
 
 if __name__ == '__main__':
-    #write_image_sent_path()
-    sent_image_bytes()
+    write_image_sent_path()
+    #sent_image_bytes()
 
 

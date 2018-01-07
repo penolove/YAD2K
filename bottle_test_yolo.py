@@ -42,10 +42,15 @@ parser.add_argument(
     help='path to directory of test images, defaults to images/',
     default='images')
 parser.add_argument(
+    '-od',
+    '--output_path_det',
+    help='path to output test images, defaults to images/out',
+    default='out')
+parser.add_argument(
     '-o',
     '--output_path',
     help='path to output test images, defaults to images/out',
-    default='out')
+    default='')
 parser.add_argument(
     '-s',
     '--score_threshold',
@@ -67,7 +72,7 @@ parser.add_argument(
 def _main(args):
     yolo_model = YoloModel(args)
     # run test images
-    #yolo_model.detect_test_folder()
+    yolo_model.detect_test_folder()
 
     @route('/echo', method='POST')
     def echo():
@@ -76,7 +81,12 @@ def _main(args):
         im_path = body['image_path']
         arrive_timestamp = arrow.now().datetime
         yolo_model.insert_image_info(im_path, arrive_timestamp)  # insert into image_info
-        yolo_model.image_detection(im_path) # detect, save into annoation
+
+        # detect image with yolo
+        detected_results = yolo_model.image_detection(im_path) # detect, save into annoation
+        # update to db
+        for detected_result in detected_results:
+            yolo_model.insert_image_annotation(detected_result)
 
     @route('/folder_detection', method='POST')
     def folder_detection():
@@ -92,7 +102,12 @@ def _main(args):
         data = request.body.read()
         file_name = request.headers.get('output_name', 'temp.jpg')
         im_path = io.BytesIO(bytearray(data))
-        yolo_model.image_detection(im_path, post_image_name=file_name)
+
+        # detect image with yolo
+        detected_results = yolo_model.image_detection(im_path, post_image_path=file_name)
+        # update to db
+        for detected_result in detected_results:
+            yolo_model.insert_image_annotation(detected_result)
 
     run(host='localhost', port=5566, debug=True)
 
@@ -103,12 +118,13 @@ class YoloModel(object):
         anchors_path = os.path.expanduser(args.anchors_path)
         classes_path = os.path.expanduser(args.classes_path)
         self.test_path = os.path.expanduser(args.test_path)
+
         self.output_path = os.path.expanduser(args.output_path)
+        # path of output det image
+        self.output_path_det = os.path.join(self.output_path, args.output_path_det)
 
+        pathlib.Path(self.output_path_det).mkdir(parents=True, exist_ok=True)
 
-        if not os.path.exists(self.output_path):
-            print('Creating output path {}'.format(self.output_path))
-            os.mkdir(self.output_path)
 
         self.sess = K.get_session()  # TODO: Remove dependence on Tensorflow session.
 
@@ -158,17 +174,25 @@ class YoloModel(object):
             self.input_image_shape,
             score_threshold=args.score_threshold,
             iou_threshold=args.iou_threshold)
+        db_path = os.path.join(self.output_path,args.db_path)
+        self.conn = sqlite3.connect(db_path)
+        self.create_db_table()
 
-        # connet/create db, add table(if not exist)
-        self.conn = sqlite3.connect(args.db_path)
+    def create_db_table(self):
+        """ connect_create_db
+            create table in the db file in db if table not exist
+
+        """
 
         print('connet/create image_info table')
         self.conn.execute('''CREATE TABLE IF NOT EXISTS image_info(
                           image_path TEXT PRIMARY KEY,
                           timestamp TIMESTAMP
                           )''')
+
         print('connet/create image_annotation table')
         self.conn.execute('''CREATE TABLE IF NOT EXISTS image_annotation(
+                          ID INTEGER PRIMARY KEY AUTOINCREMENT,
                           image_path TEXT,
                           x1 INTEGER,
                           y1 INTEGER,
@@ -179,12 +203,67 @@ class YoloModel(object):
                           )''')
         self.conn.commit()
 
+    def insert_image_info(self, image_path, arrive_timestamp):
+        try:
+            self.conn.execute('''INSERT INTO image_info(image_path, timestamp)
+                              VALUES(?,?)''', (image_path, arrive_timestamp))
+        except:
+            pass
+
+    def insert_image_annotation(self, annoation_info):
+        """ insert_image_annoation
+        insert image annoation into db
+        Parameters
+        ----------
+        annoation_info: (str, int, int, int, int, str)
+            annoation_info = (test_image_path, left, top, right, bottom, predicted_class)
+        """
+        (test_image_path, (left, top, right, bottom), predicted_class) = annoation_info
+        try:
+            self.conn.execute('''INSERT INTO image_annotation(image_path, x1, y1, x2, y2
+                                ,label) VALUES (?,?,?,?,?,?)''',
+                                (test_image_path, left, top, right, bottom, predicted_class))
+            self.conn.commit()
+        except sqlite3.IntegrityError:
+            pass
+
+    def saveImage(self, image, image_path):
+        """
+        save Image to path, if path dont exit, create it.
+
+        Parameters
+        ----------
+        image: PIL.Image.Image
+            image to save
+        image_path: str
+            image_path.
+        """
+        directory = os.path.dirname(image_path)
+        pathlib.Path(directory).mkdir(parents=True, exist_ok=True)
+        image.save(image_path, quality=90)
+
     def detect_test_folder(self):
-        #self.detect_images_in_folder(self.test_path)
+        """image_detection
+            function used to test demo images in images folder
+        """
         arrive_timestamp = arrow.now().datetime
         self.detect_images_in_folder(self.test_path, arrive_timestamp)
 
     def detect_images_in_folder(self, folder_path, arrive_timestamp):
+        """detect_images_in_folder
+            give folder_path and arrvie_timestmap to test images in the folder
+
+        Parameters
+        ----------
+        test_image_path: str
+            image_path.
+            (can pass io.bytesio object, take a look upload_image in the main)
+
+        arrive_timestamp: datetime.datetime
+            the post requtest arrive time
+
+        """
+
         for image_file in os.listdir(folder_path):
             try:
                 image_type = imghdr.what(os.path.join(folder_path, image_file))
@@ -194,41 +273,47 @@ class YoloModel(object):
                 continue
             test_image_path = os.path.join(folder_path, image_file)
             self.insert_image_info(test_image_path, arrive_timestamp)
-            self.image_detection(test_image_path)
+            # detect image with yolo
+            detected_results = self.image_detection(test_image_path)
 
-    def insert_image_info(self, image_path, arrive_timestamp):
-        try:
-            self.conn.execute('''INSERT INTO image_info(image_path, timestamp)
-                              VALUES(?,?)''', (image_path, arrive_timestamp))
-        except:
-            pass
+            for detected_reuslt in detected_results:
+                self.insert_image_annotation(detected_reuslt)
 
-    def image_detection(self, test_image_path, post_image_name=None):
+    def image_detection(self, test_image_path, post_image_path=None):
         """image_detection
-            give image_path return result of detections
+            given image_path, detected with yolo model
+            write detected_image, save to db, return detections(bbox info)
 
         Parameters
         ----------
         test_image_path: str
-            image_path.
+            image_path. current using relative path "YYYY/MM/DD/HH/mm-ss.jpg"
             (can pass io.bytesio object, take a look upload_image in the main)
 
-        post_image_name: str
-            filename to save, this is used for post io.bytesio , both saving upload file and output
+        post_image_path: str
+            filepath to save, this is used for post io.bytesio , both saving upload file and output
 
         Returns
         ---------
-        detected_result_list: List[(str, (int, int), (int, int))]
-            detected result List[(class, (x1, y1), (x2, y2))]
+        detected_result_list: List[(str, (int, int, int, int), str)]
+            detected result List[(test_image_path, (x1, y1, x2, y2), class)]
         """
 
-        image = Image.open(test_image_path)
         from_post = not isinstance(test_image_path, str)
-        if from_post:
-            test_image_path = post_image_name
-            directory = os.path.dirname(test_image_path)
-            pathlib.Path(directory).mkdir(parents=True, exist_ok=True)
-            image.save(test_image_path, quality=90)
+        if not from_post:
+            image_outpath = os.path.join(self.output_path_det, test_image_path)
+            image_path_save = test_image_path
+            test_image_path = os.path.join(self.output_path, test_image_path)
+            image = Image.open(test_image_path)
+        else:
+            image = Image.open(test_image_path)
+            # for iamge comes from io.bytesio should save it first
+            image_outpath = os.path.join(self.output_path_det, post_image_path)
+            image_path_save = post_image_path
+            test_image_path = os.path.join(self.output_path, post_image_path)
+            self.saveImage(image, test_image_path)
+
+        # start to detect image
         start_time = time.time()
         if self.is_fixed_size:  # TODO: When resizing we can use minibatch input.
             resized_image = image.resize(
@@ -277,17 +362,9 @@ class YoloModel(object):
             bottom = int(min(image.size[1], np.floor(bottom + 0.5).astype('int32')))
             right = int(min(image.size[0], np.floor(right + 0.5).astype('int32')))
             print(label, (left, top), (right, bottom))
-            detected_result_list.append((predicted_class, (left, top), (right, bottom)))
-            # save prediction result if not from post method
-
-            try:
-                self.conn.execute('''INSERT INTO image_annotation(image_path, x1, y1, x2, y2
-                                    ,label) VALUES (?,?,?,?,?,?)''',
-                                    (test_image_path, left, top, right, bottom, predicted_class))
-                self.conn.commit()
-            except sqlite3.IntegrityError:
-                pass
-
+            detected_result_list.append((image_path_save, (left, top, right, bottom),
+                                         predicted_class))
+            # creating bbox on images
             if top - label_size[1] >= 0:
                 text_origin = np.array([left, top - label_size[1]])
             else:
@@ -302,14 +379,10 @@ class YoloModel(object):
                 fill=self.colors[c])
             draw.text(text_origin, label, fill=(0, 0, 0), font=font)
             del draw
+        print("--- %s seconds ---" % (time.time() - start_time))
 
-
-            image_outpath = os.path.join(self.output_path, test_image_path)
-
-            directory = os.path.dirname(image_outpath)
-            pathlib.Path(directory).mkdir(parents=True, exist_ok=True)
-            image.save(image_outpath, quality=90)
-            print("--- %s seconds ---" % (time.time() - start_time))
+        # save  images with bbox to image_outpath
+        self.saveImage(image, image_outpath)
 
         return detected_result_list
 

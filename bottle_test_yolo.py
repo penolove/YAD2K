@@ -81,10 +81,8 @@ def _main(args):
 
     @route('/echo', method='POST')
     def echo():
-        data = request.body.read()
-        body = json.loads(data.decode())
-        im_path = body['image_path']
-        tzinfo = body.get('tzinfo', '+08:00')
+        im_path = request.headers.get('image_path', 'temp.jpg')
+        tzinfo = request.headers.get('tzinfo', '+08:00')
         arrive_timestamp = arrow.now(tzinfo).datetime
         yolo_model.insert_image_info(im_path, arrive_timestamp)  # insert into image_info
 
@@ -96,18 +94,16 @@ def _main(args):
 
     @route('/folder_detection', method='POST')
     def folder_detection():
-        data = request.body.read()
-        body = json.loads(data.decode())
-        dir_path = body['dir_path']
-        tzinfo = body.get('tzinfo', '+08:00')
+        dir_path = request.headers['dir_path']
+        tzinfo = request.headers.get('tzinfo', '+08:00')
         arrive_timestamp = arrow.now(tzinfo).datetime
         yolo_model.detect_images_in_folder(dir_path, arrive_timestamp)
 
     @route('/upload_images', method='POST')
     def upload_image():
-        """make sure you add output_name in post header"""
+        """make sure you add im_path in post header"""
         data = request.body.read()
-        file_name = request.headers.get('output_name', 'temp.jpg')
+        file_name = request.headers.get('im_path', 'temp.jpg')
         tzinfo = request.headers.get('tzinfo', '+08:00')
         im_path = io.BytesIO(bytearray(data))
         print("[upload_image] get post_image with file_name :", file_name)

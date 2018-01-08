@@ -43,11 +43,16 @@ class WbcamCaputrePygame(object):
     def post_yolo_path(self, img_path):
         print("posting path to yolo server")
         try:
-            r = requests.post("http://%s/echo"%(self.ip), data='{"image_path": "'+img_path+'"}')
+            headers = {'image_path': img_path,
+                       'tzinfo': TZINFO}
+            requests.post("http://%s/echo"%(self.ip), headers=headers)
+
         except Exception as e:
-            print("[post_yolo_path] post somewhat fails")
             print(e)
+            print("[post_yolo_path] post somewhat fails")
+
         print("post done")
+
 
     def write_image_sent_path(self):
         while True:

@@ -64,9 +64,10 @@ class WbcamCaputrePygame(object):
             if DEBUG: print("[write_image_sent_path] current writing to", img_path)
             self.img_write_webcam(img_path)
 
-            # post target_date/image_name to yolo server
-            img_path = '%s.jpg' % (os.path.join(target_date, image_name))
-            self.post_yolo_path(img_path)
+            if os.path.exists(img_path):
+                # post target_date/image_name to yolo server
+                img_path = '%s.jpg' % (os.path.join(target_date, image_name))
+                self.post_yolo_path(img_path)
             time.sleep(15)
 
 

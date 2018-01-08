@@ -80,9 +80,10 @@ def write_image_sent_path(args):
         # write to basedir/target_date/image_name
         cv2.imwrite(img_path, frame)
 
-        # post target_date/image_name to yolo server
-        img_path = '%s.jpg' % (os.path.join(target_date, image_name))
-        post_yolo_path(img_path, args)
+        if os.path.exists(img_path):
+            # post target_date/image_name to yolo server
+            img_path = '%s.jpg' % (os.path.join(target_date, image_name))
+            post_yolo_path(img_path, args)
         time.sleep(15)
 
 def sent_image_bytes():

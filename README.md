@@ -103,13 +103,17 @@ target is the path to save image and put sqlite file
 two implement for opencv, pygame (my raspberry pi fails with opencv)
 
 ```bash
-# if nosave will used sent_image_bytes method
+# if nosave will used sent_image_bytes method [not stable in raspberrypi]
 python webcam_capture_opencv.py --ip localhost:5566 -o target --nosave  
 ```
 
 ```bash
-# if nosave will used sent_image_bytes method
+# using pygame to start webcam and save image [not stable in raspberrypi]
 python webcam_capture_pygame.py --ip localhost:5566 -o target
 ```
 
+```bash
+# using fswebcam to start webcam and save img
+python webcam_capture_fswebcam.py --ip localhost:5566 -o target
+```
 

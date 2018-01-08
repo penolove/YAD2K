@@ -8,7 +8,7 @@ import pygame
 import pygame.camera
 from pygame.locals import *
 
-Debug = True
+DEBUG = True
 TZINFO = '+08:00'
 
 parser = argparse.ArgumentParser(
@@ -34,7 +34,7 @@ class WbcamCaputrePygame(object):
         pygame.camera.init()
 
     def get_img_write_webcam(self):
-        self.CAM = pygame.camera.Camera("/dev/video0",(640,480))
+        self.CAM = pygame.camera.Camera("/dev/video0", (640, 480))
         self.CAM.start()
         image = self.CAM.get_image()
         self.CAM.stop()
@@ -67,7 +67,7 @@ class WbcamCaputrePygame(object):
             # get image
             image = self.get_img_write_webcam()
             # write to basedir/target_date/image_name
-            if Debug: print("[write_image_sent_path] current writing to", img_path)
+            if DEBUG: print("[write_image_sent_path] current writing to", img_path)
             pygame.image.save(image, img_path)
 
             # post target_date/image_name to yolo server
@@ -80,5 +80,3 @@ if __name__ == '__main__':
     args = parser.parse_args()
     WCPG = WbcamCaputrePygame(args)
     WCPG.write_image_sent_path()
-
-

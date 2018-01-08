@@ -6,7 +6,7 @@ import requests
 import pathlib
 import arrow
 import tempfile
-Debug = True
+DEBUG = True
 TZINFO = '+08:00'
 
 parser = argparse.ArgumentParser(
@@ -76,7 +76,7 @@ def write_image_sent_path(args):
         pathlib.Path(target_dir).mkdir(parents=True, exist_ok=True)
         image_name = now.format('mm_ss')
         img_path = '%s.jpg' % (os.path.join(target_dir, image_name))
-        if Debug: print("[write_image_sent_path] current writing to", img_path)
+        if DEBUG: print("[write_image_sent_path] current writing to", img_path)
         # write to basedir/target_date/image_name
         cv2.imwrite(img_path, frame)
 
@@ -97,7 +97,7 @@ def sent_image_bytes():
             image_name = now.format('mm_ss')
             img_path = '%s.jpg' % (os.path.join(target_dir, image_name))
             retval, buffer = cv2.imencode('.jpg', frame)
-            if Debug: print("[sent_image_bytes] current passing ", img_path)
+            if DEBUG: print("[sent_image_bytes] current passing ", img_path)
             post_yolo_bytes(buffer.tobytes(), img_path, args)
         time.sleep(15)
 

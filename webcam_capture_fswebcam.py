@@ -4,9 +4,6 @@ import argparse
 import pathlib
 import requests
 import arrow
-import pygame
-import pygame.camera
-from pygame.locals import *
 
 DEBUG = True
 TZINFO = '+08:00'
@@ -24,14 +21,21 @@ parser.add_argument(
     help='ip address used to post image',
     default='localhost:5566')
 
+parser.add_argument(
+    '--timesleep',
+    type=int,
+    help='ip address used to post image',
+    default=10)
+
+
 parser.set_defaults(save=True)
 
-class WbcamCaputrePygame(object):
+class WbcamCaputrefswebcam(object):
     def __init__(self, args):
         self.ip = args.ip
         self.BaseDir = args.BaseDir
-        pygame.init()
-        pygame.camera.init()
+        self.timesleep = args.timesleep
+
 
     def img_write_webcam(self, file_name):
         os.system('fswebcam --save %s'%file_name) # uses Fswebcam to take picture
@@ -68,10 +72,10 @@ class WbcamCaputrePygame(object):
                 # post target_date/image_name to yolo server
                 img_path = '%s.jpg' % (os.path.join(target_date, image_name))
                 self.post_yolo_path(img_path)
-            time.sleep(15)
+            time.sleep(self.timesleep)
 
 
 if __name__ == '__main__':
     args = parser.parse_args()
-    WCPG = WbcamCaputrePygame(args)
+    WCPG = WbcamCaputrefswebcam(args)
     WCPG.write_image_sent_path()

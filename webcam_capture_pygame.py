@@ -19,10 +19,17 @@ parser.add_argument(
     '--BaseDir',
     help='used for write_image_sent_path',
     default='')
+
 parser.add_argument(
     '--ip',
     help='ip address used to post image',
     default='localhost:5566')
+
+parser.add_argument(
+    '--timesleep',
+    type=int,
+    help='ip address used to post image',
+    default=10)
 
 parser.set_defaults(save=True)
 
@@ -30,6 +37,7 @@ class WbcamCaputrePygame(object):
     def __init__(self, args):
         self.ip = args.ip
         self.BaseDir = args.BaseDir
+        self.timesleep = args.timesleep
         pygame.init()
         pygame.camera.init()
 
@@ -74,7 +82,7 @@ class WbcamCaputrePygame(object):
                 # post target_date/image_name to yolo server
                 img_path = '%s.jpg' % (os.path.join(target_date, image_name))
                 self.post_yolo_path(img_path)
-            time.sleep(15)
+            time.sleep(self.timesleep)
 
 
 if __name__ == '__main__':

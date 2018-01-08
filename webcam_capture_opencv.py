@@ -21,6 +21,11 @@ parser.add_argument(
     '--ip',
     help='ip address used to post image',
     default='localhost:5566')
+parser.add_argument(
+    '--timesleep',
+    type=int,
+    help='ip address used to post image',
+    default=10)
 
 parser.add_argument('--nosave', dest='save', action='store_false')
 parser.set_defaults(save=True)
@@ -84,7 +89,7 @@ def write_image_sent_path(args):
             # post target_date/image_name to yolo server
             img_path = '%s.jpg' % (os.path.join(target_date, image_name))
             post_yolo_path(img_path, args)
-        time.sleep(15)
+        time.sleep(args.timesleep)
 
 def sent_image_bytes():
     while True:
@@ -99,7 +104,7 @@ def sent_image_bytes():
             _, buffer = cv2.imencode('.jpg', frame)
             if DEBUG: print("[sent_image_bytes] current passing ", img_path)
             post_yolo_bytes(buffer.tobytes(), img_path, args)
-        time.sleep(15)
+        time.sleep(args.timesleep)
 
 
 if __name__ == '__main__':

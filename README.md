@@ -107,4 +107,9 @@ two implement for opencv, pygame (my raspberry pi fails with opencv)
 python webcam_capture_opencv.py --ip localhost:5566 -o target --nosave  
 ```
 
+```bash
+# if nosave will used sent_image_bytes method
+python webcam_capture_pygame.py --ip localhost:5566 -o target
+```
+
 

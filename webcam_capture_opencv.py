@@ -93,10 +93,9 @@ def sent_image_bytes():
             # get time
             now = arrow.now(TZINFO)
             target_dir = now.format('YYYY/MM/DD/HH')
-            pathlib.Path(target_dir).mkdir(parents=True, exist_ok=True)
             image_name = now.format('mm_ss')
             img_path = '%s.jpg' % (os.path.join(target_dir, image_name))
-            retval, buffer = cv2.imencode('.jpg', frame)
+            _, buffer = cv2.imencode('.jpg', frame)
             if DEBUG: print("[sent_image_bytes] current passing ", img_path)
             post_yolo_bytes(buffer.tobytes(), img_path, args)
         time.sleep(15)

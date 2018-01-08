@@ -103,7 +103,7 @@ def _main(args):
     def upload_image():
         """make sure you add im_path in post header"""
         data = request.body.read()
-        file_name = request.headers.get('im_path', 'temp.jpg')
+        file_name = request.headers.get('image_path', 'temp.jpg')
         tzinfo = request.headers.get('tzinfo', '+08:00')
         im_path = io.BytesIO(bytearray(data))
         print("[upload_image] get post_image with file_name :", file_name)

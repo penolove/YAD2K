@@ -34,7 +34,7 @@ class WbcamCaputrePygame(object):
         pygame.camera.init()
 
     def img_write_webcam(self, file_name):
-        os.system('fswebcam --save {}'%file_name) # uses Fswebcam to take picture
+        os.system('fswebcam --save %s'%file_name) # uses Fswebcam to take picture
 
     def post_yolo_path(self, img_path):
         print("posting path to yolo server")

@@ -59,7 +59,7 @@ def post_yolo_path(img_path, args):
 def post_yolo_bytes(buf, img_path, args):
     print("posting buf to yolo server")
     try:
-        headers = {'img_path': img_path,
+        headers = {'image_path': img_path,
                    'tzinfo': TZINFO}
         requests.post("http://%s/upload_images"%(args.ip), data=buf, headers=headers)
 

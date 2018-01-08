@@ -83,7 +83,7 @@ def write_image_sent_path(args):
         # post target_date/image_name to yolo server
         img_path = '%s.jpg' % (os.path.join(target_date, image_name))
         post_yolo_path(img_path, args)
-        time.sleep(5)
+        time.sleep(15)
 
 def sent_image_bytes():
     while True:

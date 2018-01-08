@@ -100,9 +100,11 @@ target is the path to save image and put sqlite file
 
 
 ## add a naive webcam program used to post image to bottle server
-python webcam_capture_routine.py
+two implement for opencv, pygame (my raspberry pi fails with opencv)
+
 ```bash
- ./bottle_test_yolo.py model_data/yolo.h5 --ip localhost:5566 -o target
+# if nosave will used sent_image_bytes method
+python webcam_capture_opencv.py --ip localhost:5566 -o target --nosave  
 ```
 
 

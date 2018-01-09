@@ -93,7 +93,7 @@ YAD2K stands on the shoulders of giants.
 Add a bottle server for receving images
  
 ```bash
- ./bottle_test_yolo.py model_data/yolo.h5 --ip localhost:5566 -o .
+python3 ./bottle_test_yolo.py model_data/yolo.h5 --ip localhost:5566 -o .
 ```
 ip is the host, port used to listen
 target is the path to save image and put sqlite file
@@ -104,16 +104,16 @@ two implement for opencv, pygame (my raspberry pi fails with opencv)
 
 ```bash
 # if nosave will used sent_image_bytes method [not stable in raspberrypi]
-python webcam_capture_opencv.py --ip localhost:5566 -o . --nosave  
+python3 webcam_capture_opencv.py --ip localhost:5566 -o . --nosave  
 ```
 
 ```bash
 # using pygame to start webcam and save image [not stable in raspberrypi]
-python webcam_capture_pygame.py --ip localhost:5566 -o .
+python3 webcam_capture_pygame.py --ip localhost:5566 -o .
 ```
 
 ```bash
 # using fswebcam to start webcam and save img
-python webcam_capture_fswebcam.py --ip localhost:5566 -o .
+python3 webcam_capture_fswebcam.py --ip localhost:5566 -o .
 ```
 

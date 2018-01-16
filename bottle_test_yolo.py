@@ -14,6 +14,7 @@ import arrow
 
 import numpy as np
 from keras import backend as K
+import tensorflow as tf
 from keras.models import load_model
 from PIL import Image, ImageDraw, ImageFont
 from bottle import route, run, request
@@ -131,6 +132,10 @@ class YoloModel(object):
         self.output_path_det = os.path.join(self.output_path, args.output_path_det)
 
         pathlib.Path(self.output_path_det).mkdir(parents=True, exist_ok=True)
+
+        config = tf.ConfigProto()
+        config.gpu_options.per_process_gpu_memory_fraction = 0.3
+        K.set_session(tf.Session(config=config))
 
         self.sess = K.get_session()  # TODO: Remove dependence on Tensorflow session.
 

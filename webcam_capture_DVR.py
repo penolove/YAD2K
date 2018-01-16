@@ -87,9 +87,8 @@ class WbcamCaputrefswebcam(object):
 
                 if os.path.exists(img_path):
                     # post target_date/image_name to yolo server
-                    img_path = '%s.jpg' % (os.path.join(target_date, image_name))
-                    self.post_yolo_path(img_path
-                    )
+                    self.post_yolo_path(img_path)
+
             time.sleep(self.timesleep)
 
 

@@ -85,7 +85,7 @@ def _main(args):
     def echo():
         im_path = request.headers.get('image_path', 'temp.jpg')
         raw_image_path2save = os.path.join(yolo_model.output_path, im_path)
-        det_image_path2save = os.path.join(yolo_model.output_path_det, file_name)
+        det_image_path2save = os.path.join(yolo_model.output_path_det, im_path)
         tzinfo = request.headers.get('tzinfo', '+08:00')
         arrive_timestamp = arrow.now(tzinfo).datetime
         yolo_model.insert_image_info(im_path, arrive_timestamp)  # insert into image_info

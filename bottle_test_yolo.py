@@ -18,8 +18,9 @@ import tensorflow as tf
 from keras.models import load_model
 from PIL import Image, ImageDraw, ImageFont
 from bottle import route, run, request
-
 from yad2k.models.keras_yolo import yolo_eval, yolo_head
+
+from LineImageSender import LineImageSender
 
 parser = argparse.ArgumentParser(
     description='Run a YOLO_v2 style detection model on test images..')
@@ -73,31 +74,50 @@ parser.add_argument(
     '--db_path',
     help='datapath of db',
     default='default_yolo.sqlite3')
+parser.add_argument(
+    '-line_broadcast',
+    '--line_broadcast',
+    help="datapath of line_broadcast setting, if not given, won't sent",
+    default=None)
 
 def _main(args):
-    yolo_model = YoloModel(args)
+    yolo_model = modelWrapper(args)
     host, port = args.ip.split(':')
     # run test images
     yolo_model.detect_test_folder()
 
+    if args.line_broadcast:
+        line_sender = LineImageSender(args.line_broadcast)
+    else:
+        line_sender = None
     @route('/echo', method='POST')
     def echo():
         im_path = request.headers.get('image_path', 'temp.jpg')
+        raw_image_path2save = os.path.join(yolo_model.output_path, im_path)
+        det_image_path2save = os.path.join(yolo_model.output_path_det, im_path)
         tzinfo = request.headers.get('tzinfo', '+08:00')
         arrive_timestamp = arrow.now(tzinfo).datetime
         yolo_model.insert_image_info(im_path, arrive_timestamp)  # insert into image_info
 
+        image_data = yolo_model.readImage(raw_image_path2save)
+
+        # [from DVR im_path format] 2018/06/05/00/08_35_7.jpg
+        print("[upload_image] get post_image with file_name :", im_path)
+
         # detect image with yolo
-        detected_results = yolo_model.image_detection(im_path) # detect, save into annoation
-        # update to db
-        for detected_result in detected_results:
-            yolo_model.insert_image_annotation(detected_result)
+        detected_results = yolo_model.image_detect_draw_save(image_data, im_path,
+                                                             det_image_path2save)
+        # sent image with line_sender
+        if line_sender:
+            detected_classes = [obj_class for (_, obj_class, _) in detected_results]
+            line_sender.object_check_and_sent(detected_classes, im_path)
 
     @route('/folder_detection', method='POST')
     def folder_detection():
         dir_path = request.headers['dir_path']
         tzinfo = request.headers.get('tzinfo', '+08:00')
         arrive_timestamp = arrow.now(tzinfo).datetime
+        # will insert image_infos with all same timestamp, and detection
         yolo_model.detect_images_in_folder(dir_path, arrive_timestamp)
 
     @route('/upload_images', method='POST')
@@ -105,33 +125,32 @@ def _main(args):
         """make sure you add im_path in post header"""
         data = request.body.read()
         file_name = request.headers.get('image_path', 'temp.jpg')
+        raw_image_path2save = os.path.join(yolo_model.output_path, file_name)
+        det_image_path2save = os.path.join(yolo_model.output_path_det, file_name)
         tzinfo = request.headers.get('tzinfo', '+08:00')
-        im_path = io.BytesIO(bytearray(data))
+
+        # read posted image from bytes, and save it.
+        image_data_raw = io.BytesIO(bytearray(data))
+        image_data = yolo_model.readImage(image_data_raw)
+        yolo_model.saveImage(image_data, raw_image_path2save)
+
         print("[upload_image] get post_image with file_name :", file_name)
+        # insert image info into image_info table
         arrive_timestamp = arrow.now(tzinfo).datetime
         yolo_model.insert_image_info(file_name, arrive_timestamp)
 
         # detect image with yolo
-        detected_results = yolo_model.image_detection(im_path, post_image_path=file_name)
-        # update to db
-        for detected_result in detected_results:
-            yolo_model.insert_image_annotation(detected_result)
+        detected_results = yolo_model.image_detect_draw_save(image_data, file_name,
+                                                             det_image_path2save)
 
-    run(host=host , port=port , debug=True)
+    run(host=host, port=port, debug=True)
 
-class YoloModel(object):
+class YoloWrapper(object):
     def __init__(self, args):
         model_path = os.path.expanduser(args.model_path)
         assert model_path.endswith('.h5'), 'Keras model must be a .h5 file.'
         anchors_path = os.path.expanduser(args.anchors_path)
         classes_path = os.path.expanduser(args.classes_path)
-        self.test_path = os.path.expanduser(args.test_path)
-
-        self.output_path = os.path.expanduser(args.output_path)
-        # path of output det image
-        self.output_path_det = os.path.join(self.output_path, args.output_path_det)
-
-        pathlib.Path(self.output_path_det).mkdir(parents=True, exist_ok=True)
 
         config = tf.ConfigProto()
         config.gpu_options.per_process_gpu_memory_fraction = 0.3
@@ -165,37 +184,108 @@ class YoloModel(object):
         self.model_image_size = self.yolo_model.layers[0].input_shape[1:3]
         self.is_fixed_size = self.model_image_size != (None, None)
 
-        # Generate colors for drawing bounding boxes.
-        hsv_tuples = [(x / len(class_names), 1., 1.)
-                      for x in range(len(class_names))]
-        colors = list(map(lambda x: colorsys.hsv_to_rgb(*x), hsv_tuples))
-        self.colors = list(
-            map(lambda x: (int(x[0] * 255), int(x[1] * 255), int(x[2] * 255)),
-                colors))
-        random.seed(10101)  # Fixed seed for consistent colors across runs.
-        random.shuffle(colors)  # Shuffle colors to decorrelate adjacent classes.
-        random.seed(None)  # Reset seed to default.
-
         # Generate output tensor targets for filtered bounding boxes.
         # TODO: Wrap these backend operations with Keras layers.
         yolo_outputs = yolo_head(self.yolo_model.output, anchors, len(class_names))
+
         self.input_image_shape = K.placeholder(shape=(2, ))
         self.boxes, self.scores, self.classes = yolo_eval(
             yolo_outputs,
             self.input_image_shape,
             score_threshold=args.score_threshold,
             iou_threshold=args.iou_threshold)
-        db_path = os.path.join(self.output_path,args.db_path)
+
+        # colors for class display
+        hsv_tuples = [(x / len(self.class_names), 1., 1.)
+                      for x in range(len(self.class_names))]
+        colors = list(map(lambda x: colorsys.hsv_to_rgb(*x), hsv_tuples))
+
+        color_pair = zip(self.class_names, colors)
+        #print([i for i in color_pair])
+        self._colors = dict([(class_name, (int(x[0] * 255), int(x[1] * 255), int(x[2] * 255)))
+                             for class_name, x in color_pair])
+
+    @property
+    def colors(self):
+        """
+        dict map class to colors.
+        """
+        return self._colors
+    def image_detection(self, image):
+        """image_detection
+            given image_path, detected with yolo model
+            write detected_image, save to db, return detections(bbox info)
+
+        Parameters
+        ----------
+        image: Pil.
+
+        Returns
+        ---------
+        detected_result_list: List[((int, int, int, int), str, float)]
+            detected result List[(left, top, right, bottom), predicted_class, score)]
+        """
+
+        # start to detect image
+        start_time = time.time()
+        if self.is_fixed_size:  # TODO: When resizing we can use minibatch input.
+            resized_image = image.resize(
+                tuple(reversed(self.model_image_size)), Image.BICUBIC)
+            image_data = np.array(resized_image, dtype='float32')
+        else:
+            # Due to skip connection + max pooling in YOLO_v2, inputs must have
+            # width and height as multiples of 32.
+            new_image_size = (image.width - (image.width % 32),
+                              image.height - (image.height % 32))
+            resized_image = image.resize(new_image_size, Image.BICUBIC)
+            image_data = np.array(resized_image, dtype='float32')
+            print(image_data.shape)
+
+        image_data /= 255.
+        image_data = np.expand_dims(image_data, 0)  # Add batch dimension.
+
+        out_boxes, out_scores, out_classes = self.sess.run(
+            [self.boxes, self.scores, self.classes],
+            feed_dict={
+                self.yolo_model.input: image_data,
+                self.input_image_shape: [image.size[1], image.size[0]],
+                K.learning_phase(): 0
+            })
+
+        detected_result_list = []
+        for i, c in reversed(list(enumerate(out_classes))):
+            predicted_class = self.class_names[c]
+            box = out_boxes[i]
+            score = out_scores[i]
+            label = '{} {:.2f}'.format(predicted_class, score)
+            top, left, bottom, right = box
+            top = int(max(0, np.floor(top + 0.5).astype('int32')))
+            left = int(max(0, np.floor(left + 0.5).astype('int32')))
+            bottom = int(min(image.size[1], np.floor(bottom + 0.5).astype('int32')))
+            right = int(min(image.size[0], np.floor(right + 0.5).astype('int32')))
+            print(label, (left, top), (right, bottom))
+            detected_result_list.append(((left, top, right, bottom), predicted_class, score))
+
+        print("--- %s seconds ---" % (time.time() - start_time))
+        return detected_result_list
+
+class modelWrapper(object):
+    def __init__(self, args):
+        self.core_detector = YoloWrapper(args)
+        self.output_path = os.path.expanduser(args.output_path)
+        # path of output det image
+        self.output_path_det = os.path.join(self.output_path, args.output_path_det)
+        db_path = os.path.join(self.output_path, args.db_path)
+        self.test_path = os.path.expanduser(args.test_path)
         self.conn = sqlite3.connect(db_path)
         self.create_db_table()
 
     def create_db_table(self):
         """ connect_create_db
             create table in the db file in db if table not exist
-
         """
-
         print('connet/create image_info table')
+
         self.conn.execute('''CREATE TABLE IF NOT EXISTS image_info(
                           image_path TEXT PRIMARY KEY,
                           timestamp TIMESTAMP
@@ -233,7 +323,7 @@ class YoloModel(object):
         try:
             self.conn.execute('''INSERT INTO image_annotation(image_path, x1, y1, x2, y2
                                 ,label) VALUES (?,?,?,?,?,?)''',
-                                (test_image_path, left, top, right, bottom, predicted_class))
+                              (test_image_path, left, top, right, bottom, predicted_class))
             self.conn.commit()
         except sqlite3.IntegrityError:
             pass
@@ -253,6 +343,95 @@ class YoloModel(object):
         pathlib.Path(directory).mkdir(parents=True, exist_ok=True)
         image.save(image_path, quality=90)
 
+    def readImage(self, test_image_path):
+        """
+        Parameters
+        ----------
+        image_path. current using relative path "YYYY/MM/DD/HH/mm-ss.jpg"
+            (can pass io.bytesio object, take a look upload_image in the main)
+
+        Returns
+        ---------
+        image: PIL.Image.Image
+        """
+        image = Image.open(test_image_path)
+        return image
+
+    def image_detection(self, image):
+        """image_detection
+            given image_path, detected with yolo model
+            write detected_image, save to db, return detections(bbox info)
+
+        Parameters
+        ----------
+        image: PIL.Image.Image
+
+        Returns
+        ---------
+        detected_result_list: List[((int, int, int, int), str, float)]
+            detected result List[((left, top, right, bottom), predicted_class, score)]
+        """
+        return self.core_detector.image_detection(image)
+
+    def draw_bbox(self, image, detected_result_list):
+        """draw_bbox
+            give folder_path and arrvie_timestmap to test images in the folder
+
+        Parameters
+        ----------
+        image: PIL.Image.Image
+            image to be added bbox
+
+        detected_result_list: List[((int, int, int, int), str, float)]
+            detected result List[((left, top, right, bottom), predicted_class, score)]
+        """
+        font = ImageFont.truetype(
+            font='font/FiraMono-Medium.otf',
+            size=np.floor(3e-2 * image.size[1] + 0.5).astype('int32'))
+        thickness = (image.size[0] + image.size[1]) // 300
+
+        for ((left, top, right, bottom), predicted_class, score) in detected_result_list:
+
+            label = '{} {:.2f}'.format(predicted_class, score)
+
+            draw = ImageDraw.Draw(image)
+            label_size = draw.textsize(label, font)
+
+            # creating bbox on images
+            if top - label_size[1] >= 0:
+                text_origin = np.array([left, top - label_size[1]])
+            else:
+                text_origin = np.array([left, top + 1])
+
+            # My kingdom for a good redistributable image drawing library.
+            for i in range(thickness):
+                draw.rectangle(
+                    [left + i, top + i, right - i, bottom - i],
+                    outline=self.core_detector.colors[predicted_class])
+            draw.rectangle(
+                [tuple(text_origin), tuple(text_origin + label_size)],
+                fill=self.core_detector.colors[predicted_class])
+            draw.text(text_origin, label, fill=(0, 0, 0), font=font)
+            del draw
+
+    def image_detect_draw_save(self, image_data, test_image_path, save_output_image_path):
+        """
+        wrapper of pipeline of detect, draw, save
+
+        """
+        # detect image with yolo
+        detected_results = self.image_detection(image_data)
+        if save_output_image_path:
+            self.draw_bbox(image_data, detected_results)
+            self.saveImage(image_data, save_output_image_path)
+
+        detected_results = [(test_image_path, (left, top, right, bottom), predicted_class)
+                            for ((left, top, right, bottom), predicted_class, score)
+                            in detected_results]
+
+        for detected_result in detected_results:
+            self.insert_image_annotation(detected_result)
+
     def detect_test_folder(self):
         """image_detection
             function used to test demo images in images folder
@@ -266,12 +445,11 @@ class YoloModel(object):
 
         Parameters
         ----------
-        test_image_path: str
-            image_path.
-            (can pass io.bytesio object, take a look upload_image in the main)
+        folder_path: str
+            folder path that contains images
 
         arrive_timestamp: datetime.datetime
-            the post requtest arrive time
+            the post request arrive time
 
         """
 
@@ -283,123 +461,18 @@ class YoloModel(object):
             except IsADirectoryError:
                 continue
             test_image_path = os.path.join(folder_path, image_file)
+            save_output_image_path = os.path.join(self.output_path_det, image_file)
+
             self.insert_image_info(test_image_path, arrive_timestamp)
+            image_data = self.readImage(test_image_path)
+
             # detect image with yolo
-            detected_results = self.image_detection(test_image_path)
-
-            for detected_reuslt in detected_results:
-                self.insert_image_annotation(detected_reuslt)
-
-    def image_detection(self, test_image_path, post_image_path=None):
-        """image_detection
-            given image_path, detected with yolo model
-            write detected_image, save to db, return detections(bbox info)
-
-        Parameters
-        ----------
-        test_image_path: str
-            image_path. current using relative path "YYYY/MM/DD/HH/mm-ss.jpg"
-            (can pass io.bytesio object, take a look upload_image in the main)
-
-        post_image_path: str
-            filepath to save, this is used for post io.bytesio , both saving upload file and output
-
-        Returns
-        ---------
-        detected_result_list: List[(str, (int, int, int, int), str)]
-            detected result List[(test_image_path, (x1, y1, x2, y2), class)]
-        """
-
-        from_post = not isinstance(test_image_path, str)
-        if not from_post:
-            image_outpath = os.path.join(self.output_path_det, test_image_path)
-            image_path_save = test_image_path
-            test_image_path = os.path.join(self.output_path, test_image_path)
-            image = Image.open(test_image_path)
-        else:
-            image = Image.open(test_image_path)
-            # for iamge comes from io.bytesio should save it first
-            image_outpath = os.path.join(self.output_path_det, post_image_path)
-            image_path_save = post_image_path
-            test_image_path = os.path.join(self.output_path, post_image_path)
-            self.saveImage(image, test_image_path)
-
-        # start to detect image
-        start_time = time.time()
-        if self.is_fixed_size:  # TODO: When resizing we can use minibatch input.
-            resized_image = image.resize(
-                tuple(reversed(self.model_image_size)), Image.BICUBIC)
-            image_data = np.array(resized_image, dtype='float32')
-        else:
-            # Due to skip connection + max pooling in YOLO_v2, inputs must have
-            # width and height as multiples of 32.
-            new_image_size = (image.width - (image.width % 32),
-                              image.height - (image.height % 32))
-            resized_image = image.resize(new_image_size, Image.BICUBIC)
-            image_data = np.array(resized_image, dtype='float32')
-            print(image_data.shape)
-
-        image_data /= 255.
-        image_data = np.expand_dims(image_data, 0)  # Add batch dimension.
-
-        out_boxes, out_scores, out_classes = self.sess.run(
-            [self.boxes, self.scores, self.classes],
-            feed_dict={
-                self.yolo_model.input: image_data,
-                self.input_image_shape: [image.size[1], image.size[0]],
-                K.learning_phase(): 0
-            })
-        print('Found {} boxes for {}'.format(len(out_boxes), test_image_path))
-
-        font = ImageFont.truetype(
-            font='font/FiraMono-Medium.otf',
-            size=np.floor(3e-2 * image.size[1] + 0.5).astype('int32'))
-        thickness = (image.size[0] + image.size[1]) // 300
-
-        detected_result_list = []
-        for i, c in reversed(list(enumerate(out_classes))):
-            predicted_class = self.class_names[c]
-            box = out_boxes[i]
-            score = out_scores[i]
-
-            label = '{} {:.2f}'.format(predicted_class, score)
-
-            draw = ImageDraw.Draw(image)
-            label_size = draw.textsize(label, font)
-
-            top, left, bottom, right = box
-            top = int(max(0, np.floor(top + 0.5).astype('int32')))
-            left = int(max(0, np.floor(left + 0.5).astype('int32')))
-            bottom = int(min(image.size[1], np.floor(bottom + 0.5).astype('int32')))
-            right = int(min(image.size[0], np.floor(right + 0.5).astype('int32')))
-            print(label, (left, top), (right, bottom))
-            detected_result_list.append((image_path_save, (left, top, right, bottom),
-                                         predicted_class))
-            # creating bbox on images
-            if top - label_size[1] >= 0:
-                text_origin = np.array([left, top - label_size[1]])
-            else:
-                text_origin = np.array([left, top + 1])
-            # My kingdom for a good redistributable image drawing library.
-            for i in range(thickness):
-                draw.rectangle(
-                    [left + i, top + i, right - i, bottom - i],
-                    outline=self.colors[c])
-            draw.rectangle(
-                [tuple(text_origin), tuple(text_origin + label_size)],
-                fill=self.colors[c])
-            draw.text(text_origin, label, fill=(0, 0, 0), font=font)
-            del draw
-        print("--- %s seconds ---" % (time.time() - start_time))
-
-        # save  images with bbox to image_outpath
-        self.saveImage(image, image_outpath)
-
-        return detected_result_list
+            self.image_detect_draw_save(image_data, test_image_path, save_output_image_path)
 
     def __del__(self):
-        self.sess.close()
         self.conn.close()
+        self.core_detector.sess.close()  # yolo
+
 
 if __name__ == '__main__':
     _main(parser.parse_args())

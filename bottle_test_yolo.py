@@ -423,7 +423,21 @@ class modelWrapper(object):
     def image_detect_draw_save(self, image_data, test_image_path, save_output_image_path):
         """
         wrapper of pipeline of detect, draw, save
+        Parameters
+        ----------
+        image_data: PIL.Image.Image
+            PIL image object
 
+        test_image_path: str
+            image_path from post
+
+        save_output_image_path: str
+            path to write
+
+        Returns
+        ---------
+        detected_results: List[((int, int, int, int), str, float)]
+            detected result List[((left, top, right, bottom), predicted_class, score)]
         """
         # detect image with yolo
         detected_results = self.image_detection(image_data)
@@ -431,12 +445,13 @@ class modelWrapper(object):
             self.draw_bbox(image_data, detected_results)
             self.saveImage(image_data, save_output_image_path)
 
-        detected_results = [(test_image_path, (left, top, right, bottom), predicted_class)
+        detected_results_with_path = [(test_image_path, (left, top, right, bottom), predicted_class)
                             for ((left, top, right, bottom), predicted_class, score)
                             in detected_results]
 
-        for detected_result in detected_results:
+        for detected_result in detected_results_with_path:
             self.insert_image_annotation(detected_result)
+        return detected_results
 
     def detect_test_folder(self):
         """image_detection

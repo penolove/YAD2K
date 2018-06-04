@@ -1,6 +1,7 @@
 import os
 import json
 
+
 from linebot import LineBotApi
 from linebot.models import ImageSendMessage
 
@@ -39,7 +40,9 @@ class LineImageSender(object):
         img_path: str
             image to sent
         """
-        if self.classes_to_sent.intersection(detected_classes):
+        overlapped_objects = self.classes_to_sent.intersection(detected_classes)
+        if overlapped_objects :
+            print("[LineImageSender] sent:", img_path)
             self.send_img(img_path)
 
     def send_img(self, img_path):

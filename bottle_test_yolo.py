@@ -79,12 +79,18 @@ parser.add_argument(
     '--line_broadcast',
     help="datapath of line_broadcast setting, if not given, won't sent",
     default=None)
+parser.add_argument(
+    '-unit_test',
+    '--unit_test',
+    help="if tested on example images",
+    default=False)
 
 def _main(args):
     yolo_model = modelWrapper(args)
     host, port = args.ip.split(':')
     # run test images
-    yolo_model.detect_test_folder()
+    if args.unit_test:
+        yolo_model.detect_test_folder()
 
     if args.line_broadcast:
         line_sender = LineImageSender(args.line_broadcast)

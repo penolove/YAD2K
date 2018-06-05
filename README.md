@@ -90,7 +90,7 @@ YAD2K stands on the shoulders of giants.
 
 
 ## add bottle server
-Add a bottle server for receving images
+Add a bottle server for receiving images
  
 ```bash
 python3 ./bottle_test_yolo.py model_data/yolo.h5 --ip localhost:5566 -o .

@@ -2,5 +2,6 @@
   "USER_IDS": [],
   "CHANNEL_ACCESS_TOKEN": "",
   "SITE_DOMAIN": "",
+  "CHANNEL_SECRET": "",
   "CLASSES_TO_SENT": ["person"]
 }

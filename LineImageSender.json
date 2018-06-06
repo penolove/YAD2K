@@ -3,5 +3,6 @@
   "CHANNEL_ACCESS_TOKEN": "",
   "SITE_DOMAIN": "",
   "CHANNEL_SECRET": "",
+  "DB_PATH": "",
   "CLASSES_TO_SENT": ["person"]
 }

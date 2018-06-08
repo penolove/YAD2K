@@ -90,10 +90,12 @@ YAD2K stands on the shoulders of giants.
 
 
 ## add bottle server
-Add a bottle server for receving images
+Add a bottle server for receiving images
  
 ```bash
 python3 ./bottle_test_yolo.py model_data/yolo.h5 --ip localhost:5566 -o .
+# adding line 
+python3 ./bottle_test_yolo.py model_data/yolo.h5 --ip localhost:5566 -o . --line_broadcast LineImageSender.json
 ```
 ip is the host, port used to listen
 target is the path to save image and put sqlite file

@@ -4,7 +4,7 @@ import sqlite3
 
 import arrow
 from linebot import LineBotApi
-from linebot.models import ImageSendMessage
+from linebot.models import ImageSendMessage, TextSendMessage
 
 QUERY_TIME_OUT = 15
 class LineImageSender(object):
@@ -62,7 +62,7 @@ class LineImageSender(object):
             self.send_img(img_path)
 
     def send_text(self, text):
-        text_msg = TextSendMessage(text=content)
+        text_msg = TextSendMessage(text=text)
         self.line_bot_api.multicast(list(self.line_audience_user_ids), text_msg)
 
     def send_img(self, img_path):

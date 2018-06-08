@@ -58,7 +58,12 @@ class LineImageSender(object):
             if self.conn and ((arrow.now() - self.watermark).total_seconds() > QUERY_TIME_OUT):
                 self.update_line_audience()
             print("[LineImageSender] sent:", img_path)
+            self.send_text(img_path)
             self.send_img(img_path)
+
+    def send_text(self, text):
+        text_msg = TextSendMessage(text=content)
+        self.line_bot_api.multicast(list(self.line_audience_user_ids), text_msg)
 
     def send_img(self, img_path):
         image_url = self.site_domain + img_path

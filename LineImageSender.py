@@ -57,6 +57,7 @@ class LineImageSender(object):
         if overlapped_objects :
             if self.conn and ((arrow.now() - self.watermark).total_seconds() > QUERY_TIME_OUT):
                 self.update_line_audience()
+                self.watermark = arrow.now()
             print("[LineImageSender] sent:", img_path)
             self.send_text(img_path)
             self.send_img(img_path)

@@ -26,7 +26,7 @@ class LineImageSender(object):
         line_json_path = os.path.expanduser(line_broadcast_path)
         with open(line_json_path) as f:
             line_settings = json.load(f)
-        self.line_audience_user_ids = line_settings['USER_IDS']
+        self.line_audience_user_ids = set(line_settings['USER_IDS'])
         channel_access_token = line_settings['CHANNEL_ACCESS_TOKEN']
         self.line_bot_api = LineBotApi(channel_access_token)
         self.site_domain = line_settings['SITE_DOMAIN']
@@ -64,5 +64,5 @@ class LineImageSender(object):
         image_url = self.site_domain + img_path
         image_msg = ImageSendMessage(original_content_url = image_url,
                                      preview_image_url = image_url)
-        self.line_bot_api.multicast(self.line_audience_user_ids, image_msg)
+        self.line_bot_api.multicast(list(self.line_audience_user_ids), image_msg)
 

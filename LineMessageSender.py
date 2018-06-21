@@ -82,7 +82,7 @@ class LineMessageSender(object):
                         text=img_path
                         ),
                     URIAction(
-                        label='full image(完整圖片)',
+                        label='full image (完整圖片)',
                         uri=image_url
                         )
                 ]

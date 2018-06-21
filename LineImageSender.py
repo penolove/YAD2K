@@ -4,10 +4,17 @@ import sqlite3
 
 import arrow
 from linebot import LineBotApi
-from linebot.models import ImageSendMessage, TextSendMessage
+from linebot.models import (
+    ImageSendMessage,
+    TextSendMessage,
+    TemplateSendMessage,
+    ButtonsTemplate,
+    MessageAction,
+    URIAction
+)
 
 QUERY_TIME_OUT = 15
-class LineImageSender(object):
+class LineBottonSender(object):
     def __init__(self, line_broadcast_path):
         """
         init a LineImageSender, used to sent image out
@@ -59,8 +66,30 @@ class LineImageSender(object):
                 self.update_line_audience()
                 self.watermark = arrow.now()
             print("[LineImageSender] sent:", img_path)
-            self.send_text(img_path)
-            self.send_img(img_path)
+            self.send_button(img_path)
+
+    def send_button(self, img_path):
+        image_url = self.site_domain + img_path
+        buttons_msg = TemplateSendMessage(
+            alt_text='object detected',
+            template=ButtonsTemplate(
+                thumbnail_image_url=image_url,
+                title='object detected',
+                text='help to report result',
+                actions=[
+                    MessageAction(
+                        label='Report Error (錯誤回報)',
+                        text=img_path
+                        ),
+                    URIAction(
+                        label='full image(完整圖片)',
+                        uri=image_url
+                        )
+                ]
+            )
+        )
+        self.line_bot_api.multicast(list(self.line_audience_user_ids), buttons_msg)
+
 
     def send_text(self, text):
         text_msg = TextSendMessage(text=text)

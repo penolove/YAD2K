@@ -20,7 +20,7 @@ from PIL import Image, ImageDraw, ImageFont
 from bottle import route, run, request
 from yad2k.models.keras_yolo import yolo_eval, yolo_head
 
-from LineImageSender import LineImageSender
+from LineMessageSender import LineMessageSender
 
 parser = argparse.ArgumentParser(
     description='Run a YOLO_v2 style detection model on test images..')
@@ -93,7 +93,7 @@ def _main(args):
         yolo_model.detect_test_folder()
 
     if args.line_broadcast:
-        line_sender = LineImageSender(args.line_broadcast)
+        line_sender = LineMessageSender(args.line_broadcast)
     else:
         line_sender = None
     @route('/echo', method='POST')

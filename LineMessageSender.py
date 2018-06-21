@@ -14,10 +14,10 @@ from linebot.models import (
 )
 
 QUERY_TIME_OUT = 15
-class LineBottonSender(object):
+class LineMessageSender(object):
     def __init__(self, line_broadcast_path):
         """
-        init a LineImageSender, used to sent image out
+        init a LineMessageSender, used to sent image out
 
         Parameters
         ----------
@@ -65,7 +65,7 @@ class LineBottonSender(object):
             if self.conn and ((arrow.now() - self.watermark).total_seconds() > QUERY_TIME_OUT):
                 self.update_line_audience()
                 self.watermark = arrow.now()
-            print("[LineImageSender] sent:", img_path)
+            print("[LineMessageSender] sent:", img_path)
             self.send_button(img_path)
 
     def send_button(self, img_path):
